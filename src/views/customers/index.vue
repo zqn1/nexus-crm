@@ -2,7 +2,11 @@
   <div class="customer-page">
     <div class="page-header">
       <h2>👥 客户管理</h2>
-      <el-button type="primary" @click="handleAdd">
+      <el-button
+        type="primary"
+        @click="handleAdd"
+        v-if="userStore.hasPermission('customer:create')"
+      >
         <el-icon><Plus /></el-icon> 新增客户
       </el-button>
     </div>
@@ -52,13 +56,34 @@
             {{ formatDate(row.createdAt) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="210" fixed="right">
+        <el-table-column label="操作" width="240" fixed="right">
           <template #default="{ row }">
-            <el-button type="primary" size="small" link @click="handleEdit(row)">
+            <el-button
+              type="primary"
+              size="small"
+              link
+              v-if="userStore.hasPermission('customer:edit')"
+              @click="handleEdit(row)"
+            >
               编辑
             </el-button>
-            <el-button type="danger" size="small" link @click="handleDelete(row)">
+            <el-button
+              type="danger"
+              size="small"
+              link
+              v-if="userStore.hasPermission('customer:delete')"
+              @click="handleDelete(row)"
+            >
               删除
+            </el-button>
+            <el-button
+              type="info"
+              size="small"
+              link
+              v-if="!userStore.hasPermission('customer:edit') && !userStore.hasPermission('customer:delete')"
+              disabled
+            >
+              无权限
             </el-button>
           </template>
         </el-table-column>
@@ -92,34 +117,31 @@ import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import { getCustomerList, deleteCustomer } from '@/api/mock'
+import { useUserStore } from '@/stores/user'
 import CustomerForm from './form.vue'
 
 export default {
   name: 'CustomerIndex',
   components: { CustomerForm, Plus },
   setup() {
-    // 表格数据
+    const userStore = useUserStore()
     const tableData = ref([])
     const loading = ref(false)
 
-    // 搜索表单
     const searchForm = reactive({
       keyword: '',
       role: '',
     })
 
-    // 分页
     const pagination = reactive({
       page: 1,
       pageSize: 10,
       total: 0,
     })
 
-    // 弹窗
     const formVisible = ref(false)
     const formData = ref(null)
 
-    // 获取数据
     const fetchData = async () => {
       loading.value = true
       try {
@@ -139,13 +161,11 @@ export default {
       }
     }
 
-    // 搜索
     const handleSearch = () => {
       pagination.page = 1
       fetchData()
     }
 
-    // 重置
     const handleReset = () => {
       searchForm.keyword = ''
       searchForm.role = ''
@@ -153,19 +173,16 @@ export default {
       fetchData()
     }
 
-    // 新增
     const handleAdd = () => {
       formData.value = null
       formVisible.value = true
     }
 
-    // 编辑
     const handleEdit = (row) => {
       formData.value = { ...row }
       formVisible.value = true
     }
 
-    // 删除
     const handleDelete = (row) => {
       ElMessageBox.confirm(`确定要删除客户「${row.name}」吗？`, '提示', {
         type: 'warning',
@@ -180,13 +197,11 @@ export default {
       })
     }
 
-    // 表单提交成功回调
     const handleFormSuccess = () => {
       formVisible.value = false
       fetchData()
     }
 
-    // 角色标签颜色
     const roleTagType = (role) => {
       const map = {
         VIP: 'success',
@@ -196,7 +211,6 @@ export default {
       return map[role] || 'info'
     }
 
-    // 日期格式化
     const formatDate = (dateStr) => {
       if (!dateStr) return '-'
       const d = new Date(dateStr)
@@ -212,6 +226,7 @@ export default {
     onMounted(fetchData)
 
     return {
+      userStore,
       tableData,
       loading,
       searchForm,

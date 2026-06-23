@@ -1,34 +1,29 @@
-import { generateUsers, generateCustomers } from './seed'
+import { generateCustomers, DEMO_USERS, ROLES, MENUS, generateExtraUsers } from './seed'
 
 const STORAGE_KEY = 'nexus_crm_mock_data'
 
 export const mockStore = {
   // ===== 基础方法 =====
-
-  /**
-   * 读取数据，若无数据则自动初始化
-   */
   read() {
     const stored = localStorage.getItem(STORAGE_KEY)
     if (stored) {
       try {
         return JSON.parse(stored)
-      } catch {
-        // 解析失败则重置
-      }
+      } catch {}
     }
     return this.reset()
   },
 
-  /**
-   * 重置数据（重新生成固定种子数据）
-   */
   reset() {
-    const users = generateUsers()
     const customers = generateCustomers()
+    const extraUsers = generateExtraUsers(10)
+    const allUsers = [...DEMO_USERS, ...extraUsers]
     const data = {
-      users,
+      users: allUsers,
       customers,
+      roles: ROLES,
+      menus: MENUS,
+      sessions: [], // 登录会话记录
       version: '1.0.0',
       seed: 2026,
       updatedAt: new Date().toISOString(),
@@ -37,30 +32,76 @@ export const mockStore = {
     return data
   },
 
-  /**
-   * 写入数据
-   */
   write(data) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
   },
 
-  // ===== 客户管理 CRUD 方法 =====
+  // ===== 用户查询方法 =====
+  findUserByUsername(username) {
+    const data = this.read()
+    const users = data.users || []
+    return users.find((u) => u.username === username) || null
+  },
 
-  /**
-   * 获取所有客户
-   */
+  getUserById(id) {
+    const data = this.read()
+    const users = data.users || []
+    return users.find((u) => u.id === id) || null
+  },
+
+  getRoles() {
+    const data = this.read()
+    return data.roles || []
+  },
+
+  getMenus() {
+    const data = this.read()
+    return data.menus || []
+  },
+
+  // 根据角色获取菜单
+  getMenusByRole(roleId) {
+    const menus = this.getMenus()
+    return menus.filter((m) => m.roles.includes(roleId))
+  },
+
+  // 根据角色获取权限
+  getPermissionsByRole(roleId) {
+    const roles = this.getRoles()
+    const role = roles.find((r) => r.id === roleId)
+    return role ? role.permissions : []
+  },
+
+  // 记录登录会话
+  addSession(userId, token) {
+    const data = this.read()
+    const sessions = data.sessions || []
+    sessions.push({
+      userId,
+      token,
+      createdAt: new Date().toISOString(),
+    })
+    data.sessions = sessions
+    this.write(data)
+  },
+
+  // 验证 Token（简化版）
+  validateToken(token) {
+    const data = this.read()
+    const sessions = data.sessions || []
+    const session = sessions.find((s) => s.token === token)
+    if (!session) return null
+    return this.getUserById(session.userId)
+  },
+
+  // ===== 客户CRUD（已有） =====
   getCustomers() {
     const data = this.read()
     return data.customers || []
   },
 
-  /**
-   * 获取客户列表（支持分页、搜索、筛选）
-   */
   getCustomerList({ page = 1, pageSize = 10, keyword = '', role = '' } = {}) {
     let customers = this.getCustomers()
-
-    // 搜索
     if (keyword) {
       const kw = keyword.toLowerCase()
       customers = customers.filter(
@@ -70,35 +111,21 @@ export const mockStore = {
           (c.email && c.email.toLowerCase().includes(kw))
       )
     }
-
-    // 角色筛选
     if (role) {
       customers = customers.filter((c) => c.role === role)
     }
-
-    // 排序（按创建时间倒序）
-    customers = [...customers].sort(
-      (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
-    )
-
+    customers = [...customers].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
     const total = customers.length
     const start = (page - 1) * pageSize
     const list = customers.slice(start, start + pageSize)
-
     return { list, total, page, pageSize }
   },
 
-  /**
-   * 根据 ID 获取单个客户
-   */
   getCustomerById(id) {
     const customers = this.getCustomers()
     return customers.find((c) => c.id === id) || null
   },
 
-  /**
-   * 新增客户
-   */
   addCustomer(data) {
     const allData = this.read()
     const customers = allData.customers || []
@@ -113,9 +140,6 @@ export const mockStore = {
     return newCustomer
   },
 
-  /**
-   * 更新客户
-   */
   updateCustomer(id, data) {
     const allData = this.read()
     const customers = allData.customers || []
@@ -126,27 +150,17 @@ export const mockStore = {
       ...data,
       updatedAt: new Date().toISOString(),
     }
-    allData.customers = [
-      ...customers.slice(0, index),
-      updated,
-      ...customers.slice(index + 1),
-    ]
+    allData.customers = [...customers.slice(0, index), updated, ...customers.slice(index + 1)]
     this.write(allData)
     return updated
   },
 
-  /**
-   * 删除客户
-   */
   deleteCustomer(id) {
     const allData = this.read()
     const customers = allData.customers || []
     const index = customers.findIndex((c) => c.id === id)
     if (index === -1) return false
-    allData.customers = [
-      ...customers.slice(0, index),
-      ...customers.slice(index + 1),
-    ]
+    allData.customers = [...customers.slice(0, index), ...customers.slice(index + 1)]
     this.write(allData)
     return true
   },

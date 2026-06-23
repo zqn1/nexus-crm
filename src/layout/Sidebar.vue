@@ -14,31 +14,32 @@
       <template v-for="item in menuItems" :key="item.path">
         <el-menu-item
           :index="item.path"
-          :disabled="item.disabled"
-          v-if="!item.disabled"
+          :disabled="item.disabled || false"
         >
           <el-icon><component :is="item.icon || 'House'" /></el-icon>
-          <template #title>{{ collapsed ? item.shortLabel : item.label }}</template>
-        </el-menu-item>
-        <!-- 禁用菜单项（只展示，不可点击） -->
-        <el-menu-item
-          v-else
-          :index="item.path"
-          disabled
-          style="cursor: not-allowed; opacity: 0.6;"
-        >
-          <el-icon><component :is="item.icon || 'Lock'" /></el-icon>
-          <template #title>{{ collapsed ? item.shortLabel : item.label }}</template>
+          <template #title>
+            {{ collapsed ? (item.shortLabel || item.title) : item.title }}
+            <el-badge
+              v-if="item.badge"
+              :value="item.badge"
+              class="menu-badge"
+            />
+          </template>
         </el-menu-item>
       </template>
     </el-menu>
+    <div class="sidebar-footer" v-if="!collapsed">
+      <el-tag size="small" type="info">
+        可访问 {{ menuItems.length }} 个模块
+      </el-tag>
+    </div>
   </div>
 </template>
 
 <script>
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
-import { menuItems } from '@/router/menu'
+import { useUserStore } from '@/stores/user'
 import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 
 export default {
@@ -48,12 +49,14 @@ export default {
   },
   setup() {
     const route = useRoute()
+    const userStore = useUserStore()
+
+    // 从 userStore 获取动态菜单
+    const menuItems = computed(() => userStore.routes || [])
+
     const activePath = computed(() => route.path)
 
-    // 注册所有图标（用于动态渲染）
-    const icons = ElementPlusIconsVue
-
-    return { menuItems, activePath, icons }
+    return { menuItems, activePath }
   },
 }
 </script>
@@ -74,6 +77,14 @@ export default {
 
   &.collapsed {
     width: 64px;
+
+    .logo span {
+      display: none;
+    }
+
+    .sidebar-footer {
+      display: none;
+    }
   }
 
   .logo {
@@ -86,21 +97,39 @@ export default {
     color: #fff;
     border-bottom: 1px solid #1f2d3d;
     background: #2b3d4e;
+
+    span {
+      transition: opacity 0.3s ease;
+    }
   }
 
   .sidebar-menu {
+    flex: 1;
     border-right: none;
     background: transparent;
+
     .el-menu-item {
       color: #bfcbd9;
+
       &.is-active {
         color: #409eff;
         background: #1f2d3d;
       }
+
       &:hover {
         background: #1f2d3d;
       }
+
+      .menu-badge {
+        margin-left: 8px;
+      }
     }
+  }
+
+  .sidebar-footer {
+    padding: 16px;
+    text-align: center;
+    border-top: 1px solid #1f2d3d;
   }
 }
 </style>
